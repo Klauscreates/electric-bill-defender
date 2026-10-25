@@ -2,6 +2,7 @@
 
 [![tests](https://github.com/klauscreates/electric-bill-defender/actions/workflows/tests.yml/badge.svg)](https://github.com/klauscreates/electric-bill-defender/actions/workflows/tests.yml)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
+![license](https://img.shields.io/badge/license-MIT-green)
 
 A local tool that estimates how much an APS household on **TOU-E** (Time-of-Use 4pm–7pm Weekdays, no demand charge) could save by shifting load out of On-Peak hours. It reads your own usage export and bills and writes an HTML report and CSV files you can audit.
 
@@ -142,3 +143,7 @@ Out of scope for now: EIA integration, device control, and savings-based billing
 ```bash
 .venv/Scripts/python -m pytest
 ```
+
+## License
+
+MIT. See [LICENSE](LICENSE).
