@@ -1,0 +1,90 @@
+# APS Rate Schedule TOU-E — Residential Time-of-Use 4pm-7pm Weekdays (no demand charge).
+#
+# Every number below was transcribed from the official APS tariff PDF listed in each
+# version's `source`. When APS files a new revision, ADD a new version entry with its
+# effective date and close the previous one with `effective_end` (exclusive). Never edit
+# the numbers of a version that has already been used in a report.
+#
+# Tariff directory: https://www.aps.com/en/Utility/Regulatory-and-Legal/Rates-Schedules-and-Adjustors
+
+utility: APS
+schedule: TOU-E
+name: Residential Time-of-Use Service, Time-of-Use 4pm-7pm Weekdays
+# Names a household file may use for this schedule (case-insensitive).
+aliases: [TOU-E, R-TOU-E, RTOUE47, "Time-of-Use 4pm-7pm Weekdays", "Saver Choice"]
+
+seasons:
+  # Season is set by the BILLING CYCLE, not the calendar date of each interval.
+  summer_billing_months: [5, 6, 7, 8, 9, 10]
+  winter_billing_months: [11, 12, 1, 2, 3, 4]
+
+# Charges on the bill that this tool does NOT model. Listed verbatim in every report.
+excluded_charges:
+  - Basic Service Charge (fixed per day; reported separately, unaffected by load shifting)
+  - Renewable Energy Adjustment Charge (REAC-1)
+  - Power Supply Adjustment (PSA-1)
+  - Transmission Cost Adjustment (TCA-1)
+  - Demand Side Management Adjustment Charge (DSMAC-1)
+  - Lost Fixed Cost Recovery (LFCR)
+  - Tax Expense Adjustor Mechanism (TEAM)
+  - Court Resolution Surcharge (CRS-1)
+  - System Reliability Benefit Adjustment Mechanism (SRB-1)
+  - Returning Customer Direct Access Charge (RCDAC-1)
+  - Grid Access Charge for on-site distributed generation
+  - Taxes, franchise fees and other governmental fees
+  - Rate riders (CPP-RES, EPR-2, EPR-6, RCP, E-3, E-4, GPS-1/2/3)
+
+versions:
+  - version_id: TOU-E-rev3
+    effective_start: 2024-03-08
+    effective_end: null          # exclusive; set when a later revision takes effect
+    source:
+      document: "Rate Schedule TOU-E, Revision No. 3, A.C.C. No. 6154 (cancelling A.C.C. No. 6122)"
+      decision: "ACC Decision No. 79293"
+      url: "https://www.aps.com/-/media/APS/APSCOM-PDFs/Utility/Regulatory-and-Legal/Regulatory-Plan-Details-Tariffs/Residential/Service-Plans/Time-of-Use-4pm-7pmWeekdays_R-TOU-E.pdf"
+      verified_on: 2026-10-24
+      verified_how: "Downloaded from the APS tariff directory and transcribed from pages 1-2."
+    basic_service_charge_per_day: 0.458
+    # Bundled energy charges, $/kWh.
+    energy_rates:
+      summer:
+        on_peak: 0.34396
+        off_peak: 0.12345
+      winter:
+        on_peak: 0.32543
+        off_peak: 0.12351
+        super_off_peak: 0.03495
+    periods:
+      on_peak:
+        start: "16:00"
+        end: "19:00"
+        weekdays_only: true
+        seasons: [summer, winter]
+      super_off_peak:
+        start: "10:00"
+        end: "15:00"
+        weekdays_only: true
+        seasons: [winter]
+    # The tariff says the listed holidays "are also included in the Off-Peak hours". It
+    # does not say whether the winter Super Off-Peak window still applies on a weekday
+    # holiday. false = the whole holiday is Off-Peak. Confirm against a real winter bill
+    # that contains a weekday holiday before relying on it.
+    holiday_super_off_peak: false
+    # observance: weekend_shift -> Saturday holiday also makes the preceding Friday
+    # Off-Peak; Sunday holiday also makes the following Monday Off-Peak ("*" in tariff).
+    # observance: none -> only the day itself ("**" in tariff, and floating holidays).
+    holidays:
+      - {name: "New Year's Day", type: fixed, month: 1, day: 1, observance: weekend_shift}
+      - {name: "Martin Luther King Day", type: nth_weekday, month: 1, weekday: MON, n: 3}
+      - {name: "Presidents Day", type: nth_weekday, month: 2, weekday: MON, n: 3}
+      - {name: "Cesar Chavez Day", type: fixed, month: 3, day: 31, observance: weekend_shift}
+      - {name: "Memorial Day", type: nth_weekday, month: 5, weekday: MON, n: -1}
+      - {name: "Juneteenth", type: fixed, month: 6, day: 19, observance: weekend_shift}
+      - {name: "Independence Day", type: fixed, month: 7, day: 4, observance: weekend_shift}
+      - {name: "Labor Day", type: nth_weekday, month: 9, weekday: MON, n: 1}
+      - {name: "Indigenous Peoples' Day / Columbus Day", type: nth_weekday, month: 10, weekday: MON, n: 2}
+      - {name: "Veterans Day", type: fixed, month: 11, day: 11, observance: weekend_shift}
+      - {name: "Thanksgiving", type: nth_weekday, month: 11, weekday: THU, n: 4}
+      - {name: "Christmas Eve", type: fixed, month: 12, day: 24, observance: none}
+      - {name: "Christmas Day", type: fixed, month: 12, day: 25, observance: weekend_shift}
+      - {name: "New Year's Eve", type: fixed, month: 12, day: 31, observance: none}

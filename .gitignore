@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.egg-info/
+.pytest_cache/
+# Household data and outputs stay local and out of version control.
+data/
+households/
+workspaces/
+reports/
+synthetic/
+demo/

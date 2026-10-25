@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "electric-bill-defender"
+version = "0.1.0"
+description = "Local APS TOU-E savings validation: import usage exports, validate them, and model load-shift scenarios."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["pandas>=2.0", "pyyaml>=6.0"]
+
+[project.optional-dependencies]
+test = ["pytest>=7"]
+
+[project.scripts]
+ebd = "ebd.cli:main"
+
+[tool.setuptools]
+packages = ["ebd"]
+
+[tool.setuptools.package-data]
+ebd = ["tariffs/*.yaml"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

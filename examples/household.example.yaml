@@ -1,0 +1,45 @@
+# Household configuration. Copy to households/<name>.yaml (git-ignored) and fill in from YOUR bills.
+# Every field here comes from a real APS bill; nothing is assumed.
+
+household_id: my-home
+synthetic: false
+
+account:
+  utility: APS
+  rate_schedule: TOU-E          # as printed on the bill ("Time-of-Use 4pm-7pm Weekdays", TOU-E)
+  confirmed_on: 2026-10-24      # date you checked the bill
+  # All three must be stated. Any `true` stops the analysis with an explanation.
+  solar: false
+  battery: false
+  demand_charge: false
+
+billing_cycles:
+  # start/end = first and last day of service shown on the bill (both inclusive).
+  # billing_month = the month the bill is for; it sets summer (May-Oct) or winter (Nov-Apr).
+  # bill_days (optional) is cross-checked against start..end.
+  - id: 2025-07
+    start: 2025-06-13
+    end: 2025-07-14
+    bill_days: 32
+    billing_month: 2025-07
+    bill:
+      # Base energy charges exactly as printed. Leave out lines your bill does not show.
+      energy_line_items:
+        on_peak:  {kwh: 0, dollars: 0.00}
+        off_peak: {kwh: 0, dollars: 0.00}
+      # energy_total_dollars: 0.00        # if the bill only shows a total energy charge
+      # energy_total_kwh: 0
+      other_charges:                      # listed in the report as excluded, not modeled
+        - {name: Basic Service Charge, dollars: 0.00}
+        - {name: Power Supply Adjustment, dollars: 0.00}
+    notes: ""                             # document any reconciliation discrepancy here
+
+  - id: 2026-01
+    start: 2025-12-12
+    end: 2026-01-12
+    billing_month: 2026-01
+    bill:
+      energy_line_items:
+        on_peak:        {kwh: 0, dollars: 0.00}
+        off_peak:       {kwh: 0, dollars: 0.00}
+        super_off_peak: {kwh: 0, dollars: 0.00}
