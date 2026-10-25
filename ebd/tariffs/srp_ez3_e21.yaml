@@ -31,6 +31,9 @@ shift_destination: {start: "18:00", end: "22:00"}
 
 bill_rounding: per_component
 
+# Flat plans that can be priced from a bill's total kWh, for `ebd bill-check` comparisons.
+compare_with: [srp_basic_e23.yaml]
+
 excluded_charges:
   - Monthly Service Charge (fixed by service tier; unaffected by load shifting)
   - City, county and state taxes

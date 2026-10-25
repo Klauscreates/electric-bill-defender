@@ -130,7 +130,8 @@ def cmd_bill_check(a) -> int:
         a.out.mkdir(parents=True, exist_ok=True)
         r["checks"].to_csv(a.out / "bill_check.csv", index=False, lineterminator="\n")
         r["estimates"].to_csv(a.out / "bill_estimate.csv", index=False, lineterminator="\n")
-        print(f"\nWrote {a.out / 'bill_check.csv'} and {a.out / 'bill_estimate.csv'}")
+        r["comparison"].to_csv(a.out / "plan_comparison.csv", index=False, lineterminator="\n")
+        print(f"\nWrote bill_check.csv, bill_estimate.csv and plan_comparison.csv to {a.out}")
     return EXIT_OK if len(r["checks"]) and r["checks"].within_tolerance.all() else EXIT_ISSUES
 
 

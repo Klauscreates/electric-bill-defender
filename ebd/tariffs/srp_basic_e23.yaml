@@ -1,0 +1,54 @@
+# SRP Price Plan E-23 — Standard Price Plan for Residential Service, marketed as "SRP Basic".
+#
+# A flat (non-time-of-use) plan: every kWh in a billing cycle costs the same, so it can be
+# priced from a bill's total kWh alone. Used here as the comparison plan for SRP TOU
+# households. Transcribed from SRP's official price-plan PDF; versions selected by billing
+# month. Only versions verified against an official document are listed.
+
+utility: SRP
+schedule: E-23
+name: Standard Price Plan for Residential Service, SRP Basic
+aliases: [E-23, Basic, "Basic Plan", "SRP Basic", "SRP Basic Price Plan"]
+notes:
+  - "Only the May-October 2026 billing cycles are configured. SRP's standing E-23 price sheet for other billing cycles has not been transcribed yet, so those cycles are not compared."
+
+version_basis: billing_month
+
+seasons:
+  summer: [5, 6, 9, 10]
+  summer_peak: [7, 8]
+  winter: [11, 12, 1, 2, 3, 4]
+
+# Flat plan: no on-peak hours, so shift scenarios change nothing. Required by the schema.
+shift_destination: {start: "18:00", end: "22:00"}
+
+bill_rounding: per_component
+
+excluded_charges:
+  - Monthly Service Charge (fixed by service tier; same as E-21)
+  - City, county and state taxes
+  - Late payment fees and other account charges
+
+versions:
+  - version_id: E-23-2026-05-temp-FPPA
+    effective_start: "2026-05"
+    effective_end: "2026-11"
+    source:
+      document: "SRP Standard Electric Price Plans, E-23 (pp. 39-41), Includes Temporary Decrease to Fuel & Purchased Power Adjustment, Effective: May 2026 to October 2026 Billing Cycles. Published April 27, 2026"
+      url: "https://azure-na-assets.contentstack.com/v3/assets/bltefc1fc708dcc94e7/blte387c22be2e0a2f6/2025-Ratebook-with-Temporary-FPPAM.pdf"
+      verified_on: 2026-10-25
+      verified_how: "Downloaded and transcribed from pages 40-41."
+    fixed_charges:
+      per_month_by_tier: {tier_1: 20.00, tier_2: 30.00, tier_3: 40.00}
+    energy_rates:
+      summer:      {all_hours: 0.1166}
+      summer_peak: {all_hours: 0.1360}
+      winter:      {all_hours: 0.1097}
+    energy_rate_components:
+      summer:
+        all_hours: {billing_customer_service: 0.0066, distribution_facilities: 0.0037, distribution_delivery: 0.0139, transmission: 0.0090, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0023, ancillary_3_6: 0.0011, system_benefits: 0.0034, generation: 0.0343, fuel_purchased_power: 0.0429}
+      summer_peak:
+        all_hours: {billing_customer_service: 0.0066, distribution_facilities: 0.0042, distribution_delivery: 0.0161, transmission: 0.0105, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0027, ancillary_3_6: 0.0012, system_benefits: 0.0034, generation: 0.0490, fuel_purchased_power: 0.0429}
+      winter:
+        all_hours: {billing_customer_service: 0.0066, distribution_facilities: 0.0033, distribution_delivery: 0.0127, transmission: 0.0082, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0021, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0264, fuel_purchased_power: 0.0467}
+    holidays: []

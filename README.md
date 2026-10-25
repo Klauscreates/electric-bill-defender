@@ -76,6 +76,8 @@ ebd bill-check --household households/home.yaml
 
 This prices each bill's own On-Peak and Off-Peak kWh with the configured tariff and compares the result with the printed dollars. A match to the cent shows that the rates and the utility's rounding are right. It also gives a **bill-level** estimate: what moving 10/25/50% (and 100% for the ceiling) of that month's On-Peak kWh to Off-Peak would have saved. It cannot tell whether the load can actually move, or what that does to the evening. That takes hourly data and `analyze`.
 
+For SRP E-21 households it also compares each bill with the flat **SRP Basic (E-23)** plan, priced from the bill's total kWh. Enter the comparison SRP prints on the bill ("$X higher than if you were on the Basic Plan") as `utility_comparison` and the tool checks its own figure against it. Basic prices are configured only for the May-October 2026 billing cycles so far.
+
 The tariff config is picked automatically from the household's `utility` and `rate_schedule`; `--tariff` overrides it.
 
 ### 4. Validate

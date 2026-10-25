@@ -15,8 +15,8 @@ from ebd.util import ConfigError, as_date, hhmm_to_minutes, sha256_file
 
 TARIFF_DIR = Path(__file__).parent / "tariffs"
 DEFAULT_TARIFF = TARIFF_DIR / "aps_tou_e.yaml"
-PERIODS = ("on_peak", "off_peak", "super_off_peak")
-PERIOD_LABELS = {"on_peak": "On-Peak", "off_peak": "Off-Peak", "super_off_peak": "Super Off-Peak"}
+PERIODS = ("on_peak", "off_peak", "super_off_peak", "all_hours")
+PERIOD_LABELS = {"on_peak": "On-Peak", "off_peak": "Off-Peak", "super_off_peak": "Super Off-Peak", "all_hours": "All kWh"}
 VERSION_BASES = ("service_date", "billing_month")
 
 
@@ -46,7 +46,7 @@ class TariffVersion:
     fixed_charges: dict
     energy_rates: dict[str, dict[str, float]]
     rate_components: dict[str, dict[str, dict[str, float]]]
-    on_peak: Window
+    on_peak: Window | None      # None = flat plan: every hour is 'all_hours'
     super_off_peak: Window | None
     holiday_rules: list[dict]
     holiday_super_off_peak: bool
@@ -80,6 +80,7 @@ class Tariff:
     bill_rounding: str
     excluded_charges: list[str]
     notes: list[str]
+    compare_with: list[str]
     versions: list[TariffVersion]
     path: Path
     sha256: str
@@ -185,8 +186,8 @@ def load_tariff(path: str | Path = DEFAULT_TARIFF) -> Tariff:
                         raise ConfigError(f"{where}: {s} {p} components sum to {sum(cs.values()):.4f}, total says {rates[s][p]:.4f}")
             if bill_rounding == "per_component" and not comps:
                 raise ConfigError(f"{where}: bill_rounding per_component needs energy_rate_components")
-            periods = v["periods"]
-            on_peak = _window(periods["on_peak"], f"{where}.periods.on_peak", set(seasons))
+            periods = v.get("periods") or {}
+            on_peak = _window(periods["on_peak"], f"{where}.periods.on_peak", set(seasons)) if periods.get("on_peak") else None
             sop = _window(periods["super_off_peak"], f"{where}.periods.super_off_peak", set(seasons)) if periods.get("super_off_peak") else None
             for h in v.get("holidays") or []:
                 if h.get("type") == "nth_weekday" and h.get("weekday") not in WEEKDAYS:
@@ -206,10 +207,14 @@ def load_tariff(path: str | Path = DEFAULT_TARIFF) -> Tariff:
             )
         except KeyError as e:
             raise ConfigError(f"{path}: {where} is missing {e}") from e
-        for season in seasons:
-            version.rate(season, "off_peak")
-        for season in on_peak.seasons:
-            version.rate(season, "on_peak")
+        if on_peak is None:
+            for season in seasons:
+                version.rate(season, "all_hours")
+        else:
+            for season in seasons:
+                version.rate(season, "off_peak")
+            for season in on_peak.seasons:
+                version.rate(season, "on_peak")
         if sop:
             for season in sop.seasons:
                 version.rate(season, "super_off_peak")
@@ -239,6 +244,7 @@ def load_tariff(path: str | Path = DEFAULT_TARIFF) -> Tariff:
         bill_rounding=bill_rounding,
         excluded_charges=list(raw.get("excluded_charges") or []),
         notes=list(raw.get("notes") or []),
+        compare_with=list(raw.get("compare_with") or []),
         versions=versions,
         path=path,
         sha256=sha256_file(path),
@@ -274,6 +280,9 @@ def classify(tariff: Tariff, ts: pd.Series, season: pd.Series, version_id: pd.Se
         minute = t.dt.hour * 60 + t.dt.minute + t.dt.second / 60
         weekday = t.dt.day_of_week < 5
         dates = t.dt.date
+        if v.on_peak is None:
+            out[m] = "all_hours"
+            continue
         hol = tariff.holidays(v, t.dt.year.unique().tolist())
         is_hol = dates.isin(list(hol))
 

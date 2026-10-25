@@ -128,3 +128,37 @@ def test_full_srp_run(case, tmp_path, srp):
     assert set(hours[iv.in_dest_window]) == {18, 19, 20, 21}
     html = (tmp_path / "srp" / "report.html").read_text(encoding="utf-8")
     assert "SRP E-21" in html and "summer_peak" in html
+
+
+# --- SRP Basic (E-23) and plan comparison --------------------------------------------
+
+def test_basic_plan_is_flat(srp):
+    basic = load_tariff(TARIFF_DIR / "srp_basic_e23.yaml")
+    v = basic.version_for(billing_month_date("2026-08"))
+    assert v.on_peak is None
+    assert v.energy_rates == {"summer": {"all_hours": 0.1166}, "summer_peak": {"all_hours": 0.1360}, "winter": {"all_hours": 0.1097}}
+    assert period(basic, "2026-08-04 16:00", "summer_peak", v.version_id) == "all_hours"
+    assert basic.version_for(billing_month_date("2026-11")) is None      # standing sheet not transcribed
+    assert srp.compare_with == ["srp_basic_e23.yaml"]
+
+
+def test_plan_comparison_from_bill_totals(tmp_path, srp):
+    on, off = 300, 2000
+    on_usd, off_usd = float(_round_each(on, SUMMER_2026_ON)), float(_round_each(off, SUMMER_2026_OFF))
+    basic_comps = ["0.0066", "0.0037", "0.0139", "0.0090", "-0.0006", "0.0023", "0.0011", "0.0034", "0.0343", "0.0429"]
+    basic_usd = float(_round_each(on + off, basic_comps))
+    expected = (on_usd + off_usd - basic_usd) * (1 + 10.0 / (on_usd + off_usd + 30.0))
+    bill = {"energy_line_items": {"on_peak": {"kwh": on, "dollars": on_usd}, "off_peak": {"kwh": off, "dollars": off_usd}},
+            "other_charges": [{"name": "Monthly Service Charge", "dollars": 30.0}, {"name": "Sales Tax", "dollars": 10.0}],
+            "utility_comparison": {"plan": "Basic", "current_minus_alternative": round(expected, 2)}}
+    nov = {"energy_line_items": {"on_peak": {"kwh": 100, "dollars": 12.94}, "off_peak": {"kwh": 900, "dollars": 87.30}}}
+    p = tmp_path / "h.yaml"
+    p.write_text(yaml.safe_dump({"account": SRP_ACCOUNT, "billing_cycles": [
+        cycle("2026-09-09", "2026-10-09", "2026-10", bill=bill), cycle("2026-10-10", "2026-11-09", "2026-11", bill=nov)]}), encoding="utf-8")
+    comp = bill_check(load_household(p, srp), srp)["comparison"].set_index("cycle_id")
+    oct_ = comp.loc["2026-10"]
+    assert oct_.alternative_energy_dollars == pytest.approx(basic_usd)
+    assert oct_.current_minus_alternative == pytest.approx(on_usd + off_usd - basic_usd)
+    assert oct_.current_minus_alternative_with_tax == pytest.approx(expected)
+    assert bool(oct_.matches_utility) is True
+    assert comp.loc["2026-11", "result"] == "no configured price version for this billing month"

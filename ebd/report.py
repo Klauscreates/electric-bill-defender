@@ -118,7 +118,7 @@ def render(ctx: dict) -> str:
                      f"Effective {v.effective_start}{' to ' + str(v.effective_end) if v.effective_end else ''}. "
                      f"Source: <a href='{escape(v.source['url'])}'>APS tariff PDF</a>, verified {escape(str(v.source['verified_on']))}.</p>")
         parts.append(table(rates))
-        windows = [f"On-Peak {v.on_peak.text()}"]
+        windows = [f"On-Peak {v.on_peak.text()}"] if v.on_peak else ["Flat price for all hours"]
         if v.super_off_peak:
             windows.append(f"Super Off-Peak {v.super_off_peak.text()}")
         holidays = ", ".join(h["name"] for h in v.holiday_rules)
