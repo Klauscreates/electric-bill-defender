@@ -26,6 +26,10 @@ class ScenarioSettings:
     shares: tuple[float, ...] = SHIFT_SHARES
     dest_window: tuple[str, str] = DEST_WINDOW
 
+    @classmethod
+    def for_tariff(cls, tariff: Tariff, shares: tuple[float, ...] = SHIFT_SHARES) -> "ScenarioSettings":
+        return cls(shares=shares, dest_window=tariff.shift_destination)
+
     @property
     def dest_minutes(self) -> tuple[int, int]:
         return hhmm_to_minutes(self.dest_window[0], "dest start"), hhmm_to_minutes(self.dest_window[1], "dest end")
@@ -41,7 +45,7 @@ class ScenarioSettings:
                  "label": "illustrative sensitivity scenario"} for s in self.shares
             ],
             "ceiling": {"key": CEILING, "share_of_on_peak_kwh": 1.0,
-                        "destination": "same day, the lowest-priced non-on-peak hours (winter weekdays: super off-peak; otherwise all off-peak hours), spread evenly by time",
+                        "destination": "same day, the lowest-priced non-on-peak hours (super off-peak where the tariff has it, otherwise all off-peak hours), spread evenly by time",
                         "label": "theoretical ceiling, physically unvalidated"},
         }
 

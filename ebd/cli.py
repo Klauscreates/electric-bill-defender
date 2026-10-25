@@ -1,4 +1,4 @@
-"""Command line: `ebd import`, `ebd validate`, `ebd analyze`."""
+"""Command line: `ebd import`, `ebd validate`, `ebd analyze`, `ebd bill-check`."""
 
 from __future__ import annotations
 
@@ -9,7 +9,9 @@ from pathlib import Path
 from ebd import LOCAL_TZ
 from ebd.household import load_household
 from ebd.importer import Mapping, normalize, preview_text, read_raw, write_import, load_normalized
-from ebd.tariff import DEFAULT_TARIFF, load_tariff
+import yaml
+
+from ebd.tariff import find_tariff, load_tariff
 from ebd.util import ConfigError, UnsupportedAccount
 from ebd.validate import DEFAULT_MAX_KW, issues_for_csv, summary_text, validate
 
@@ -17,7 +19,7 @@ EXIT_OK, EXIT_ISSUES, EXIT_CONFIG, EXIT_UNSUPPORTED = 0, 1, 2, 3
 
 
 def _parser() -> argparse.ArgumentParser:
-    p = argparse.ArgumentParser(prog="ebd", description="APS TOU-E savings validation (local only).")
+    p = argparse.ArgumentParser(prog="ebd", description="APS TOU-E / SRP EZ-3 savings validation (local only).")
     sub = p.add_subparsers(dest="command", required=True)
 
     im = sub.add_parser("import", help="map a usage CSV into normalized intervals (preview unless --confirm)")
@@ -43,11 +45,31 @@ def _parser() -> argparse.ArgumentParser:
         sp = sub.add_parser(name, help=help_)
         sp.add_argument("--workspace", type=Path, required=True)
         sp.add_argument("--household", type=Path, required=True)
-        sp.add_argument("--tariff", type=Path, default=DEFAULT_TARIFF)
+        sp.add_argument("--tariff", type=Path, help="tariff config; default: the bundled one matching the household's utility and plan")
         sp.add_argument("--max-kw", type=float, default=DEFAULT_MAX_KW, help="average kW above which a reading is invalid")
         if name == "analyze":
             sp.add_argument("--out", type=Path, required=True, help="output folder for the report and CSVs")
+
+    bc = sub.add_parser("bill-check", help="check the tariff against printed bill charges and give a bill-level estimate (no hourly data)")
+    bc.add_argument("--household", type=Path, required=True)
+    bc.add_argument("--tariff", type=Path)
+    bc.add_argument("--out", type=Path, help="optional folder for bill_check.csv and bill_estimate.csv")
     return p
+
+
+def resolve_tariff(arg: Path | None, household_path: Path):
+    if arg:
+        return load_tariff(arg)
+    try:
+        account = (yaml.safe_load(Path(household_path).read_text(encoding="utf-8")) or {}).get("account") or {}
+    except (OSError, yaml.YAMLError) as e:
+        raise ConfigError(f"cannot read household config {household_path}: {e}") from e
+    found = find_tariff(account.get("utility", ""), account.get("rate_schedule", ""))
+    if found is None:
+        raise UnsupportedAccount(
+            f"No bundled tariff for {account.get('utility')!r} {account.get('rate_schedule')!r}. "
+            "Supported: APS TOU-E (4-7 p.m., no demand charge) and SRP E-21 EZ-3 (3-6 p.m.).")
+    return load_tariff(found)
 
 
 def cmd_import(a) -> int:
@@ -68,7 +90,7 @@ def cmd_import(a) -> int:
 
 
 def cmd_validate(a) -> int:
-    tariff = load_tariff(a.tariff)
+    tariff = resolve_tariff(a.tariff, a.household)
     hh = load_household(a.household, tariff)
     rows, _ = load_normalized(a.workspace)
     res = validate(rows, hh, tariff, max_kw=a.max_kw)
@@ -81,7 +103,7 @@ def cmd_validate(a) -> int:
 
 def cmd_analyze(a) -> int:
     from ebd.analyze import run_analysis
-    tariff = load_tariff(a.tariff)
+    tariff = resolve_tariff(a.tariff, a.household)
     hh = load_household(a.household, tariff)
     r = run_analysis(a.workspace, hh, tariff, a.out, max_kw=a.max_kw)
     val = r["validation"]
@@ -97,13 +119,28 @@ def cmd_analyze(a) -> int:
     return EXIT_OK
 
 
+def cmd_bill_check(a) -> int:
+    from ebd.billcheck import bill_check, bill_check_text
+    tariff = resolve_tariff(a.tariff, a.household)
+    hh = load_household(a.household, tariff)
+    r = bill_check(hh, tariff)
+    print(f"{tariff.utility} {tariff.schedule}: {tariff.name}\n")
+    print(bill_check_text(r))
+    if a.out:
+        a.out.mkdir(parents=True, exist_ok=True)
+        r["checks"].to_csv(a.out / "bill_check.csv", index=False, lineterminator="\n")
+        r["estimates"].to_csv(a.out / "bill_estimate.csv", index=False, lineterminator="\n")
+        print(f"\nWrote {a.out / 'bill_check.csv'} and {a.out / 'bill_estimate.csv'}")
+    return EXIT_OK if len(r["checks"]) and r["checks"].within_tolerance.all() else EXIT_ISSUES
+
+
 def main(argv: list[str] | None = None) -> int:
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, "reconfigure"):
             stream.reconfigure(errors="replace")
     a = _parser().parse_args(argv)
     try:
-        return {"import": cmd_import, "validate": cmd_validate, "analyze": cmd_analyze}[a.command](a)
+        return {"import": cmd_import, "validate": cmd_validate, "analyze": cmd_analyze, "bill-check": cmd_bill_check}[a.command](a)
     except UnsupportedAccount as e:
         print(f"Unsupported account:\n{e}", file=sys.stderr)
         return EXIT_UNSUPPORTED

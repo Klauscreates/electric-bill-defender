@@ -1,0 +1,145 @@
+# SRP Price Plan E-21 — Residential Super Peak Time-of-Use (3-6 p.m.), marketed as "SRP EZ-3".
+#
+# Every number below was transcribed from the official SRP price-plan PDFs listed in each
+# version's `source`. SRP price changes take effect by BILLING CYCLE, so versions here are
+# selected by each cycle's billing month (YYYY-MM), not by calendar date. Add a new version
+# for every SRP price change; never edit a version already used in a report.
+#
+# E-21 is frozen to new customers from the November 2025 billing cycle and is scheduled to
+# end by the November 2029 billing cycle (customers then move to E-23).
+
+utility: SRP
+schedule: E-21
+name: Price Plan for Residential Super Peak Time-of-Use Service (3-6 p.m.), SRP EZ-3
+aliases: [E-21, EZ-3, "EZ-3 Plan", "EZ-3 Plan (3-6pm)", "SRP EZ-3", "SRP EZ-3 Price Plan"]
+notes:
+  - "Holiday observance (Saturday -> Friday, Sunday -> Monday) is assumed for the holidays SRP marks 'observed'; the price plan does not define it."
+  - "SRP prints each unbundled price component rounded to the cent; reconciliation reproduces that rounding."
+
+version_basis: billing_month
+
+# "Summer is defined as the May, June, September, and October billing cycles. Summer Peak
+# is defined as the July and August billing cycles. Winter is defined as the November
+# through April billing cycles."
+seasons:
+  summer: [5, 6, 9, 10]
+  summer_peak: [7, 8]
+  winter: [11, 12, 1, 2, 3, 4]
+
+# On-peak ends at 6 p.m.; shift scenarios move load into the following four hours.
+shift_destination: {start: "18:00", end: "22:00"}
+
+bill_rounding: per_component
+
+excluded_charges:
+  - Monthly Service Charge (fixed by service tier; unaffected by load shifting)
+  - City, county and state taxes
+  - Late payment fees and other account charges
+  - Riders (Economy Discount, Medical Life Support Equipment Discount, Energy Attribute Certificate, Renewable Net Metering, Carbon Reduction)
+
+versions:
+  - version_id: E-21-2025-11
+    effective_start: "2025-11"
+    effective_end: "2026-01"
+    source:
+      document: "SRP E-21 price plan, Effective: November 2025 Billing Cycle (supersedes May 2019)"
+      url: "https://www.srpnet.com/assets/srpnet/pdf/price-plans/FY26/2025 Ratebook E-21.pdf"
+      verified_on: 2026-10-25
+      verified_how: "Downloaded from srpnet.com and transcribed from pages 2-4."
+    fixed_charges:
+      per_month_by_tier: {tier_1: 20.00, tier_2: 30.00, tier_3: 40.00}
+    energy_rates:
+      summer:      {on_peak: 0.3102, off_peak: 0.1036}
+      summer_peak: {on_peak: 0.3667, off_peak: 0.1075}
+      winter:      {on_peak: 0.1300, off_peak: 0.0976}
+    energy_rate_components:
+      summer:
+        on_peak:  {billing_customer_service: 0.0137, distribution_facilities: 0.0071, distribution_delivery: 0.0357, transmission: 0.0168, transmission_cost_adjustment: 0.0000, ancillary_1_2: 0.0053, ancillary_3_6: 0.0027, system_benefits: 0.0034, generation: 0.1633, fuel_purchased_power: 0.0622}
+        off_peak: {billing_customer_service: 0.0046, distribution_facilities: 0.0024, distribution_delivery: 0.0119, transmission: 0.0056, transmission_cost_adjustment: 0.0000, ancillary_1_2: 0.0018, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0280, fuel_purchased_power: 0.0450}
+      summer_peak:
+        on_peak:  {billing_customer_service: 0.0162, distribution_facilities: 0.0084, distribution_delivery: 0.0422, transmission: 0.0198, transmission_cost_adjustment: 0.0000, ancillary_1_2: 0.0062, ancillary_3_6: 0.0032, system_benefits: 0.0034, generation: 0.2051, fuel_purchased_power: 0.0622}
+        off_peak: {billing_customer_service: 0.0047, distribution_facilities: 0.0025, distribution_delivery: 0.0124, transmission: 0.0058, transmission_cost_adjustment: 0.0000, ancillary_1_2: 0.0018, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0310, fuel_purchased_power: 0.0450}
+      winter:
+        on_peak:  {billing_customer_service: 0.0057, distribution_facilities: 0.0030, distribution_delivery: 0.0150, transmission: 0.0070, transmission_cost_adjustment: 0.0000, ancillary_1_2: 0.0022, ancillary_3_6: 0.0011, system_benefits: 0.0034, generation: 0.0304, fuel_purchased_power: 0.0622}
+        off_peak: {billing_customer_service: 0.0043, distribution_facilities: 0.0022, distribution_delivery: 0.0112, transmission: 0.0053, transmission_cost_adjustment: 0.0000, ancillary_1_2: 0.0017, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0236, fuel_purchased_power: 0.0450}
+    periods: &periods
+      on_peak: {start: "15:00", end: "18:00", weekdays_only: true, seasons: [summer, summer_peak, winter]}
+    holidays: &holidays
+      - {name: "New Year's Day", type: fixed, month: 1, day: 1, observance: weekend_shift}
+      - {name: "Memorial Day", type: nth_weekday, month: 5, weekday: MON, n: -1}
+      - {name: "Independence Day", type: fixed, month: 7, day: 4, observance: weekend_shift}
+      - {name: "Labor Day", type: nth_weekday, month: 9, weekday: MON, n: 1}
+      - {name: "Thanksgiving Day", type: nth_weekday, month: 11, weekday: THU, n: 4}
+      - {name: "Christmas Day", type: fixed, month: 12, day: 25, observance: weekend_shift}
+
+  - version_id: E-21-2026-01-TCA
+    effective_start: "2026-01"
+    effective_end: "2026-05"
+    source:
+      document: "SRP E-21 price plan, Includes Decrease to Transmission Cost Adjustment, Effective: January 2026 Billing Cycle"
+      url: "https://azure-na-assets.contentstack.com/v3/assets/bltefc1fc708dcc94e7/blt52c7eae65a7a7038/2025_Ratebook_E-21_with_TCA.pdf"
+      verified_on: 2026-10-25
+      verified_how: "Downloaded from SRP's asset host and transcribed from pages 3-4."
+    fixed_charges:
+      per_month_by_tier: {tier_1: 20.00, tier_2: 30.00, tier_3: 40.00}
+    energy_rates: &rates_2026_01
+      summer:      {on_peak: 0.3096, off_peak: 0.1030}
+      summer_peak: {on_peak: 0.3661, off_peak: 0.1069}
+      winter:      {on_peak: 0.1294, off_peak: 0.0970}
+    energy_rate_components: &components_2026_01
+      summer:
+        on_peak:  {billing_customer_service: 0.0137, distribution_facilities: 0.0071, distribution_delivery: 0.0357, transmission: 0.0168, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0053, ancillary_3_6: 0.0027, system_benefits: 0.0034, generation: 0.1633, fuel_purchased_power: 0.0622}
+        off_peak: {billing_customer_service: 0.0046, distribution_facilities: 0.0024, distribution_delivery: 0.0119, transmission: 0.0056, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0018, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0280, fuel_purchased_power: 0.0450}
+      summer_peak:
+        on_peak:  {billing_customer_service: 0.0162, distribution_facilities: 0.0084, distribution_delivery: 0.0422, transmission: 0.0198, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0062, ancillary_3_6: 0.0032, system_benefits: 0.0034, generation: 0.2051, fuel_purchased_power: 0.0622}
+        off_peak: {billing_customer_service: 0.0047, distribution_facilities: 0.0025, distribution_delivery: 0.0124, transmission: 0.0058, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0018, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0310, fuel_purchased_power: 0.0450}
+      winter:
+        on_peak:  {billing_customer_service: 0.0057, distribution_facilities: 0.0030, distribution_delivery: 0.0150, transmission: 0.0070, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0022, ancillary_3_6: 0.0011, system_benefits: 0.0034, generation: 0.0304, fuel_purchased_power: 0.0622}
+        off_peak: {billing_customer_service: 0.0043, distribution_facilities: 0.0022, distribution_delivery: 0.0112, transmission: 0.0053, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0017, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0236, fuel_purchased_power: 0.0450}
+    periods: *periods
+    holidays: *holidays
+
+  - version_id: E-21-2026-05-temp-FPPA
+    effective_start: "2026-05"
+    effective_end: "2026-11"
+    source:
+      document: "SRP Standard Electric Price Plans, E-21 (pp. 27-30), Includes Temporary Decrease to Fuel & Purchased Power Adjustment, Effective: May 2026 to October 2026 Billing Cycles. Published April 27, 2026"
+      url: "https://azure-na-assets.contentstack.com/v3/assets/bltefc1fc708dcc94e7/blte387c22be2e0a2f6/2025-Ratebook-with-Temporary-FPPAM.pdf"
+      verified_on: 2026-10-25
+      verified_how: "Downloaded and transcribed from pages 29-30; reproduces a real October 2026 E-21 bill's on-peak and off-peak energy charges to the cent."
+    fixed_charges:
+      per_month_by_tier: {tier_1: 20.00, tier_2: 30.00, tier_3: 40.00}
+    energy_rates:
+      summer:      {on_peak: 0.3058, off_peak: 0.0992}
+      summer_peak: {on_peak: 0.3623, off_peak: 0.1031}
+      winter:      {on_peak: 0.1294, off_peak: 0.0970}
+    energy_rate_components:
+      summer:
+        on_peak:  {billing_customer_service: 0.0137, distribution_facilities: 0.0071, distribution_delivery: 0.0357, transmission: 0.0168, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0053, ancillary_3_6: 0.0027, system_benefits: 0.0034, generation: 0.1633, fuel_purchased_power: 0.0584}
+        off_peak: {billing_customer_service: 0.0046, distribution_facilities: 0.0024, distribution_delivery: 0.0119, transmission: 0.0056, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0018, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0280, fuel_purchased_power: 0.0412}
+      summer_peak:
+        on_peak:  {billing_customer_service: 0.0162, distribution_facilities: 0.0084, distribution_delivery: 0.0422, transmission: 0.0198, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0062, ancillary_3_6: 0.0032, system_benefits: 0.0034, generation: 0.2051, fuel_purchased_power: 0.0584}
+        off_peak: {billing_customer_service: 0.0047, distribution_facilities: 0.0025, distribution_delivery: 0.0124, transmission: 0.0058, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0018, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0310, fuel_purchased_power: 0.0412}
+      winter:
+        on_peak:  {billing_customer_service: 0.0057, distribution_facilities: 0.0030, distribution_delivery: 0.0150, transmission: 0.0070, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0022, ancillary_3_6: 0.0011, system_benefits: 0.0034, generation: 0.0304, fuel_purchased_power: 0.0622}
+        off_peak: {billing_customer_service: 0.0043, distribution_facilities: 0.0022, distribution_delivery: 0.0112, transmission: 0.0053, transmission_cost_adjustment: -0.0006, ancillary_1_2: 0.0017, ancillary_3_6: 0.0009, system_benefits: 0.0034, generation: 0.0236, fuel_purchased_power: 0.0450}
+    periods: *periods
+    holidays: *holidays
+
+  # The temporary decrease is bounded to the May-October 2026 billing cycles by its own
+  # document, so the January 2026 price sheet applies again from November 2026. Confirm
+  # against the first November 2026 bill; add a new version if SRP has changed prices.
+  - version_id: E-21-2026-11
+    effective_start: "2026-11"
+    effective_end: null
+    source:
+      document: "SRP E-21 price plan, Includes Decrease to Transmission Cost Adjustment, Effective: January 2026 Billing Cycle (resumes after the temporary May-Oct 2026 FPPA decrease)"
+      url: "https://azure-na-assets.contentstack.com/v3/assets/bltefc1fc708dcc94e7/blt52c7eae65a7a7038/2025_Ratebook_E-21_with_TCA.pdf"
+      verified_on: 2026-10-25
+      verified_how: "Same document as E-21-2026-01-TCA; not yet checked against a November 2026 bill."
+    fixed_charges:
+      per_month_by_tier: {tier_1: 20.00, tier_2: 30.00, tier_3: 40.00}
+    energy_rates: *rates_2026_01
+    energy_rate_components: *components_2026_01
+    periods: *periods
+    holidays: *holidays

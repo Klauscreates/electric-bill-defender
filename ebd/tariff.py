@@ -13,9 +13,11 @@ import yaml
 from ebd.holidays import WEEKDAYS, offpeak_holidays
 from ebd.util import ConfigError, as_date, hhmm_to_minutes, sha256_file
 
-DEFAULT_TARIFF = Path(__file__).parent / "tariffs" / "aps_tou_e.yaml"
-SEASONS = ("summer", "winter")
+TARIFF_DIR = Path(__file__).parent / "tariffs"
+DEFAULT_TARIFF = TARIFF_DIR / "aps_tou_e.yaml"
 PERIODS = ("on_peak", "off_peak", "super_off_peak")
+PERIOD_LABELS = {"on_peak": "On-Peak", "off_peak": "Off-Peak", "super_off_peak": "Super Off-Peak"}
+VERSION_BASES = ("service_date", "billing_month")
 
 
 @dataclass(frozen=True)
@@ -25,6 +27,15 @@ class Window:
     weekdays_only: bool
     seasons: tuple[str, ...]
 
+    def text(self) -> str:
+        def hm(m):
+            h, mm = divmod(m, 60)
+            suffix = "a.m." if h < 12 or h == 24 else "p.m."
+            h12 = h % 12 or 12
+            return f"{h12}{':%02d' % mm if mm else ''} {suffix}"
+        days = "weekdays" if self.weekdays_only else "every day"
+        return f"{hm(self.start_min)}–{hm(self.end_min)} {days} ({', '.join(self.seasons)})"
+
 
 @dataclass
 class TariffVersion:
@@ -32,8 +43,9 @@ class TariffVersion:
     effective_start: date
     effective_end: date | None  # exclusive
     source: dict
-    basic_service_charge_per_day: float
+    fixed_charges: dict
     energy_rates: dict[str, dict[str, float]]
+    rate_components: dict[str, dict[str, dict[str, float]]]
     on_peak: Window
     super_off_peak: Window | None
     holiday_rules: list[dict]
@@ -48,6 +60,13 @@ class TariffVersion:
         except KeyError:
             raise ConfigError(f"{self.version_id}: no {season} {period} rate") from None
 
+    def fixed_charge(self, days: int, tier: str | None) -> float:
+        """Fixed service charge for a cycle of `days` days, or NaN when it can't be known."""
+        if "per_day" in self.fixed_charges:
+            return days * float(self.fixed_charges["per_day"])
+        by_tier = self.fixed_charges.get("per_month_by_tier") or {}
+        return float(by_tier[tier]) if tier in by_tier else float("nan")
+
 
 @dataclass
 class Tariff:
@@ -55,9 +74,12 @@ class Tariff:
     schedule: str
     name: str
     aliases: list[str]
-    summer_billing_months: set[int]
-    winter_billing_months: set[int]
+    version_basis: str
+    seasons: dict[str, set[int]]
+    shift_destination: tuple[str, str]
+    bill_rounding: str
     excluded_charges: list[str]
+    notes: list[str]
     versions: list[TariffVersion]
     path: Path
     sha256: str
@@ -67,11 +89,10 @@ class Tariff:
         return str(name).strip().lower() in {a.lower() for a in [self.schedule, *self.aliases]}
 
     def season_for_billing_month(self, month: int) -> str:
-        if month in self.summer_billing_months:
-            return "summer"
-        if month in self.winter_billing_months:
-            return "winter"
-        raise ConfigError(f"billing month {month} is in neither season")
+        for name, months in self.seasons.items():
+            if month in months:
+                return name
+        raise ConfigError(f"billing month {month} is in no season")
 
     def version_for(self, d: date) -> TariffVersion | None:
         for v in self.versions:
@@ -91,8 +112,12 @@ class Tariff:
             self._holiday_cache[key] = offpeak_holidays(version.holiday_rules, sorted(set(years)))
         return self._holiday_cache[key]
 
+    def season_text(self) -> str:
+        names = {i: m for i, m in enumerate(["", "Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"])}
+        return "; ".join(f"{s}: {', '.join(names[m] for m in sorted(ms))}" for s, ms in self.seasons.items())
 
-def _window(cfg: dict, name: str) -> Window:
+
+def _window(cfg: dict, name: str, seasons: set[str]) -> Window:
     w = Window(
         start_min=hhmm_to_minutes(cfg["start"], f"{name}.start"),
         end_min=hhmm_to_minutes(cfg["end"], f"{name}.end"),
@@ -101,10 +126,27 @@ def _window(cfg: dict, name: str) -> Window:
     )
     if w.start_min >= w.end_min:
         raise ConfigError(f"{name}: start must be before end (windows may not wrap midnight)")
-    bad = set(w.seasons) - set(SEASONS)
+    bad = set(w.seasons) - seasons
     if bad:
         raise ConfigError(f"{name}: unknown seasons {sorted(bad)}")
     return w
+
+
+def _effective(value, field_name: str, basis: str) -> date:
+    """Service-date versions use YYYY-MM-DD; billing-month versions use YYYY-MM (first of month)."""
+    if basis == "billing_month":
+        text = value.strftime("%Y-%m") if isinstance(value, date) else str(value)
+        try:
+            y, m = text.split("-")[:2]
+            return date(int(y), int(m), 1)
+        except ValueError:
+            raise ConfigError(f"{field_name}: expected YYYY-MM billing month, got {value!r}") from None
+    return as_date(value, field_name)
+
+
+def billing_month_date(label: str) -> date:
+    y, m = str(label).split("-")[:2]
+    return date(int(y), int(m), 1)
 
 
 def load_tariff(path: str | Path = DEFAULT_TARIFF) -> Tariff:
@@ -114,29 +156,49 @@ def load_tariff(path: str | Path = DEFAULT_TARIFF) -> Tariff:
     except (OSError, yaml.YAMLError) as e:
         raise ConfigError(f"cannot read tariff config {path}: {e}") from e
 
+    basis = raw.get("version_basis", "service_date")
+    if basis not in VERSION_BASES:
+        raise ConfigError(f"{path}: version_basis must be one of {VERSION_BASES}")
+    seasons = {str(k): set(v) for k, v in (raw.get("seasons") or {}).items()}
+    months = [m for ms in seasons.values() for m in ms]
+    if sorted(months) != list(range(1, 13)):
+        raise ConfigError(f"{path}: seasons must assign each billing month 1-12 to exactly one season")
+    bill_rounding = raw.get("bill_rounding", "none")
+    if bill_rounding not in ("none", "per_component"):
+        raise ConfigError(f"{path}: bill_rounding must be 'none' or 'per_component'")
+
     versions = []
     for i, v in enumerate(raw.get("versions") or []):
         where = f"versions[{i}]"
         try:
             rates = {s: {p: float(r) for p, r in pr.items()} for s, pr in v["energy_rates"].items()}
             for s, pr in rates.items():
-                if s not in SEASONS or set(pr) - set(PERIODS):
+                if s not in seasons or set(pr) - set(PERIODS):
                     raise ConfigError(f"{where}.energy_rates: unknown season/period in {s}: {sorted(pr)}")
                 if any(r < 0 for r in pr.values()):
                     raise ConfigError(f"{where}.energy_rates: negative rate in {s}")
+            comps = {s: {p: {c: float(x) for c, x in cs.items()} for p, cs in pr.items()}
+                     for s, pr in (v.get("energy_rate_components") or {}).items()}
+            for s, pr in comps.items():
+                for p, cs in pr.items():
+                    if abs(sum(cs.values()) - rates[s][p]) > 1e-9:
+                        raise ConfigError(f"{where}: {s} {p} components sum to {sum(cs.values()):.4f}, total says {rates[s][p]:.4f}")
+            if bill_rounding == "per_component" and not comps:
+                raise ConfigError(f"{where}: bill_rounding per_component needs energy_rate_components")
             periods = v["periods"]
-            on_peak = _window(periods["on_peak"], f"{where}.periods.on_peak")
-            sop = _window(periods["super_off_peak"], f"{where}.periods.super_off_peak") if periods.get("super_off_peak") else None
+            on_peak = _window(periods["on_peak"], f"{where}.periods.on_peak", set(seasons))
+            sop = _window(periods["super_off_peak"], f"{where}.periods.super_off_peak", set(seasons)) if periods.get("super_off_peak") else None
             for h in v.get("holidays") or []:
                 if h.get("type") == "nth_weekday" and h.get("weekday") not in WEEKDAYS:
                     raise ConfigError(f"{where}.holidays: bad weekday in {h}")
             version = TariffVersion(
                 version_id=str(v["version_id"]),
-                effective_start=as_date(v["effective_start"], f"{where}.effective_start"),
-                effective_end=as_date(v["effective_end"], f"{where}.effective_end") if v.get("effective_end") else None,
+                effective_start=_effective(v["effective_start"], f"{where}.effective_start", basis),
+                effective_end=_effective(v["effective_end"], f"{where}.effective_end", basis) if v.get("effective_end") else None,
                 source=dict(v.get("source") or {}),
-                basic_service_charge_per_day=float(v["basic_service_charge_per_day"]),
+                fixed_charges=dict(v.get("fixed_charges") or {}),
                 energy_rates=rates,
+                rate_components=comps,
                 on_peak=on_peak,
                 super_off_peak=sop,
                 holiday_rules=list(v.get("holidays") or []),
@@ -144,9 +206,10 @@ def load_tariff(path: str | Path = DEFAULT_TARIFF) -> Tariff:
             )
         except KeyError as e:
             raise ConfigError(f"{path}: {where} is missing {e}") from e
+        for season in seasons:
+            version.rate(season, "off_peak")
         for season in on_peak.seasons:
             version.rate(season, "on_peak")
-            version.rate(season, "off_peak")
         if sop:
             for season in sop.seasons:
                 version.rate(season, "super_off_peak")
@@ -161,24 +224,39 @@ def load_tariff(path: str | Path = DEFAULT_TARIFF) -> Tariff:
         if a.effective_end is None or a.effective_end > b.effective_start:
             raise ConfigError(f"tariff versions {a.version_id} and {b.version_id} overlap; set effective_end on the earlier one")
 
-    seasons = raw.get("seasons") or {}
-    summer = set(seasons.get("summer_billing_months") or [])
-    winter = set(seasons.get("winter_billing_months") or [])
-    if summer & winter or summer | winter != set(range(1, 13)):
-        raise ConfigError(f"{path}: summer and winter billing months must partition 1-12")
+    dest = raw.get("shift_destination") or {}
+    if not dest.get("start") or not dest.get("end"):
+        raise ConfigError(f"{path}: shift_destination start/end are required")
 
     return Tariff(
         utility=raw.get("utility", ""),
         schedule=raw["schedule"],
         name=raw.get("name", raw["schedule"]),
         aliases=list(raw.get("aliases") or []),
-        summer_billing_months=summer,
-        winter_billing_months=winter,
+        version_basis=basis,
+        seasons=seasons,
+        shift_destination=(str(dest["start"]), str(dest["end"])),
+        bill_rounding=bill_rounding,
         excluded_charges=list(raw.get("excluded_charges") or []),
+        notes=list(raw.get("notes") or []),
         versions=versions,
         path=path,
         sha256=sha256_file(path),
     )
+
+
+def bundled_tariffs() -> list[Path]:
+    return sorted(TARIFF_DIR.glob("*.yaml"))
+
+
+def find_tariff(utility: str, schedule: str) -> Path | None:
+    """The bundled tariff config for a utility + rate schedule name, if one exists."""
+    for p in bundled_tariffs():
+        raw = yaml.safe_load(p.read_text(encoding="utf-8"))
+        names = {str(a).strip().lower() for a in [raw.get("schedule", ""), *(raw.get("aliases") or [])]}
+        if str(raw.get("utility", "")).lower() == str(utility).strip().lower() and str(schedule).strip().lower() in names:
+            return p
+    return None
 
 
 def classify(tariff: Tariff, ts: pd.Series, season: pd.Series, version_id: pd.Series) -> pd.Series:
@@ -221,3 +299,13 @@ def rates_for(tariff: Tariff, season: pd.Series, period: pd.Series, version_id: 
     for v, s, p in keys.drop_duplicates().itertuples(index=False):
         lookup[(v, s, p)] = tariff.get_version(v).rate(s, p)
     return pd.Series([lookup[k] for k in zip(keys.v, keys.s, keys.p)], index=period.index, dtype=float)
+
+
+def bill_line_charge(tariff: Tariff, version: TariffVersion, season: str, period: str, kwh: float) -> float:
+    """What the utility would print for `kwh` in one period, using its rounding convention."""
+    if tariff.bill_rounding == "per_component":
+        comps = version.rate_components[season][period]
+        # Utilities round half up to the cent on each printed component.
+        return sum(float(np.floor(kwh * c * 100 + 0.5 + 1e-9) / 100) if kwh * c >= 0
+                   else -float(np.floor(-kwh * c * 100 + 0.5 + 1e-9) / 100) for c in comps.values())
+    return kwh * version.rate(season, period)

@@ -1,14 +1,14 @@
-# Electric-Bill Defender: APS savings validation
+# Electric-Bill Defender: APS & SRP time-of-use savings validation
 
 [![tests](https://github.com/klauscreates/electric-bill-defender/actions/workflows/tests.yml/badge.svg)](https://github.com/klauscreates/electric-bill-defender/actions/workflows/tests.yml)
 ![python](https://img.shields.io/badge/python-3.10%2B-blue)
 ![license](https://img.shields.io/badge/license-MIT-green)
 
-A local tool that estimates how much an APS household on **TOU-E** (Time-of-Use 4pm–7pm Weekdays, no demand charge) could save by shifting load out of On-Peak hours. It reads your own usage export and bills and writes an HTML report and CSV files you can audit.
+A local tool that estimates how much an Arizona household on a time-of-use plan could save by shifting load out of On-Peak hours. Supported plans: **APS TOU-E** (Time-of-Use 4pm–7pm Weekdays, no demand charge) and **SRP E-21 "EZ-3"** (3–6 p.m. weekdays). It reads your own usage export and bills and writes an HTML report and CSV files you can audit.
 
 Everything runs on your machine. The tool uses no utility credentials, makes no network calls, and uploads nothing.
 
-> Independent project, not affiliated with or endorsed by Arizona Public Service. Results are model estimates, not a guarantee of savings or billing advice.
+> Independent project, not affiliated with or endorsed by Arizona Public Service or Salt River Project. Results are model estimates, not a guarantee of savings or billing advice.
 
 ## Try it in a minute (synthetic data)
 
@@ -26,7 +26,8 @@ Open `demo/report/report.html`. The synthetic household is fake and labeled as s
 
 | Supported | Rejected, with an explanation |
 |---|---|
-| APS TOU-E, non-solar, no battery | Demand-charge plans (R-2, R-3/R3-47, Saver Choice Plus/Max) |
+| APS TOU-E, non-solar, no battery | APS demand-charge plans (R-2, R-3/R3-47, Saver Choice Plus/Max) |
+| SRP E-21 (EZ-3, 3–6 p.m.), non-solar | SRP E-23 Basic, E-16 demand, solar plans (E-13/14/15/27), unconfigured TOU plans (E-22, E-26, E-28, E-29) |
 | Interval data at 60 minutes or finer | Solar, net billing, exports (negative kWh) |
 | Tariff revisions you add to the config | Batteries, daily data, non-TOU plans |
 
@@ -66,6 +67,16 @@ Copy [examples/household.example.yaml](examples/household.example.yaml) to `hous
 - The solar, battery and demand-charge flags. All three are required.
 - Each billing cycle's first and last service day and its billing month. The billing month sets the season.
 - The bill's energy line items, used for reconciliation.
+
+### 3a. Check your bills (no hourly data needed)
+
+```bash
+ebd bill-check --household households/home.yaml
+```
+
+This prices each bill's own On-Peak and Off-Peak kWh with the configured tariff and compares the result with the printed dollars. A match to the cent shows that the rates and the utility's rounding are right. It also gives a **bill-level** estimate: what moving 10/25/50% (and 100% for the ceiling) of that month's On-Peak kWh to Off-Peak would have saved. It cannot tell whether the load can actually move, or what that does to the evening. That takes hourly data and `analyze`.
+
+The tariff config is picked automatically from the household's `utility` and `rate_schedule`; `--tariff` overrides it.
 
 ### 4. Validate
 
@@ -120,6 +131,21 @@ All of these columns are in `interval_calculations.csv`:
 Summing by `cycle_id` gives `cycle_scenario_summary.csv`. A test checks this.
 
 ## Tariff configuration
+
+### SRP E-21 (EZ-3)
+
+[ebd/tariffs/srp_ez3_e21.yaml](ebd/tariffs/srp_ez3_e21.yaml) is transcribed from SRP's official price-plan PDFs. SRP changes prices by **billing cycle**, so versions are chosen by each cycle's billing month:
+
+| Version | Billing cycles | Summer on/off ($/kWh) | Source |
+|---|---|---|---|
+| E-21-2025-11 | Nov–Dec 2025 | 0.3102 / 0.1036 | E-21, effective Nov 2025 |
+| E-21-2026-01-TCA | Jan–Apr 2026 | 0.3096 / 0.1030 | E-21 with TCA decrease, Jan 2026 |
+| E-21-2026-05-temp-FPPA | May–Oct 2026 | 0.3058 / 0.0992 | Temporary fuel-price decrease, May–Oct 2026 |
+| E-21-2026-11 | Nov 2026 onward | 0.3096 / 0.1030 | Jan 2026 sheet resumes; confirm against a November 2026 bill |
+
+SRP has three seasons (summer May/Jun/Sep/Oct, summer peak Jul/Aug, winter Nov–Apr). It prints each of 10 price components rounded to the cent, and reconciliation reproduces that rounding. Shift scenarios move load into 6–10 p.m. The config checks that the components add up to each published total, which catches transcription errors.
+
+### APS TOU-E
 
 [ebd/tariffs/aps_tou_e.yaml](ebd/tariffs/aps_tou_e.yaml) holds TOU-E **Revision 3**:
 - A.C.C. No. 6154, ACC Decision No. 79293, effective 2024-03-08.

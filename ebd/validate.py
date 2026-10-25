@@ -10,7 +10,7 @@ import numpy as np
 import pandas as pd
 
 from ebd.household import Household
-from ebd.tariff import Tariff, classify
+from ebd.tariff import Tariff, billing_month_date, classify
 
 DEFAULT_MAX_KW = 50.0
 EPS_MIN = 1e-6
@@ -60,11 +60,17 @@ def validate(rows: pd.DataFrame, household: Household, tariff: Tariff, max_kw: f
         df.loc[m, "cycle_id"] = c.cycle_id
         df.loc[m, "season"] = c.season
     in_cycle = df.cycle_id.notna()
-    dates = df.start.dt.date
-    for d in dates[in_cycle].unique():
-        v = tariff.version_for(d)
-        if v:
-            df.loc[in_cycle & (dates == d), "version_id"] = v.version_id
+    if tariff.version_basis == "billing_month":
+        for c in household.cycles:
+            v = tariff.version_for(billing_month_date(c.billing_month))
+            if v:
+                df.loc[df.cycle_id == c.cycle_id, "version_id"] = v.version_id
+    else:
+        dates = df.start.dt.date
+        for d in dates[in_cycle].unique():
+            v = tariff.version_for(d)
+            if v:
+                df.loc[in_cycle & (dates == d), "version_id"] = v.version_id
 
     # --- row-level problems ------------------------------------------------------
     for idx in df.index[df.import_error != ""]:

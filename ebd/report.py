@@ -32,7 +32,7 @@ code { font-size:12.5px; } .tag { display:inline-block; font-size:12px; padding:
 """
 
 MONEY = {"baseline_energy_cost", "scenario_energy_cost", "modeled_savings", "modeled_dollars", "bill_dollars",
-         "dollar_difference", "modeled_basic_service_charge", "rate_per_kwh"}
+         "dollar_difference", "modeled_fixed_charge", "rate_per_kwh"}
 
 
 def _fmt(col: str, v) -> str:
@@ -82,7 +82,7 @@ def render(ctx: dict) -> str:
     hh, tariff, val, rec, settings = ctx["household"], ctx["tariff"], ctx["validation"], ctx["reconciliation"], ctx["settings"]
     summary: pd.DataFrame = ctx["summary"]
     shift_keys = [k for k in settings.keys() if k != CEILING]
-    parts = [f"<h1>Electric-Bill Defender: APS TOU-E savings validation</h1>",
+    parts = [f"<h1>Electric-Bill Defender: {escape(tariff.utility)} {escape(tariff.schedule)} savings validation</h1>",
              f"<p class='muted'>Household <b>{escape(hh.household_id)}</b> · rate schedule {escape(hh.rate_schedule)} "
              f"(confirmed {escape(hh.confirmed_on or 'date not recorded')}) · tool v{escape(ctx['tool_version'])} · "
              f"run manifest <code>manifest.json</code></p>"]
@@ -118,13 +118,18 @@ def render(ctx: dict) -> str:
                      f"Effective {v.effective_start}{' to ' + str(v.effective_end) if v.effective_end else ''}. "
                      f"Source: <a href='{escape(v.source['url'])}'>APS tariff PDF</a>, verified {escape(str(v.source['verified_on']))}.</p>")
         parts.append(table(rates))
-        parts.append(f"<p class='muted'>On-Peak 4–7 p.m. weekdays year-round; Super Off-Peak 10 a.m.–3 p.m. weekdays in winter billing cycles "
-                     f"(Nov–Apr); tariff holidays Off-Peak (Saturday holidays observed Friday, Sunday holidays Monday, except Dec 24 and 31). "
-                     f"Super Off-Peak on weekday holidays: {'applied' if v.holiday_super_off_peak else 'not applied'} (tariff text is silent; confirm with a bill).</p>")
+        windows = [f"On-Peak {v.on_peak.text()}"]
+        if v.super_off_peak:
+            windows.append(f"Super Off-Peak {v.super_off_peak.text()}")
+        holidays = ", ".join(h["name"] for h in v.holiday_rules)
+        parts.append(f"<p class='muted'>{escape('; '.join(windows))}; all other hours Off-Peak. Seasons by billing month: "
+                     f"{escape(tariff.season_text())}. Holidays with no On-Peak hours: {escape(holidays)}.</p>")
+    if tariff.notes:
+        parts.append("<ul>" + "".join(f"<li class='muted'>{escape(n)}</li>" for n in tariff.notes) + "</ul>")
 
     # --- baseline / reconciliation
     parts.append("<h2>3. Baseline reconstruction and bill reconciliation</h2>")
-    parts.append("<p>Base energy charge = Σ interval kWh × bundled rate for its period, season (from the billing month) and tariff version. "
+    parts.append("<p>Base energy charge = Σ interval kWh × per-kWh rate for its period, season (from the billing month) and tariff version. "
                  "Compared with the energy line items entered from each bill.</p>")
     if len(rec.cycles):
         parts.append(table(rec.cycles))
@@ -158,7 +163,7 @@ def render(ctx: dict) -> str:
 
         parts.append("<h2>5. Theoretical ceiling (physically unvalidated)</h2>")
         parts.append("<div class='banner bad'><b>Physically unvalidated.</b> Moves <i>all</i> On-Peak kWh into the same day's cheapest "
-                     "non-On-Peak hours (winter weekdays: Super Off-Peak; otherwise all Off-Peak hours). No household could realistically do this; "
+                     "non-On-Peak hours (Super Off-Peak where the tariff has it; otherwise all Off-Peak hours). No household could realistically do this; "
                      "it only bounds what the tariff could reward.</div>")
         c = summary[summary.scenario == CEILING][cols].drop(columns="scenario")
         parts.append(table(c, {"destination_max_avg_kw_before": "dest. max kW before", "destination_max_avg_kw_after": "dest. max kW after"}))

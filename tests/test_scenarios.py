@@ -188,8 +188,14 @@ def test_reconciliation(case, tariff, tmp_path, loaded):
     assert res["2024-10"] == "matched within tolerance"       # summer (October billing)
     assert res["2024-11"] == "matched within tolerance"       # winter
     assert res["2024-12"].startswith("unexplained difference")
-    assert rec.status == "validated"
+    assert rec.status == "pending" and "Synthetic" in rec.status_reason   # fixtures can never validate
     assert rec.excluded.charge.tolist() == ["PSA"]
+
+    raw = yaml.safe_load(hp.read_text(encoding="utf-8"))
+    raw["synthetic"] = False
+    hp.write_text(yaml.safe_dump(raw, sort_keys=False), encoding="utf-8")
+    r = run_analysis(ws, load_household(hp, tariff), tariff, tmp_path / "rec2")
+    assert r["reconciliation"].status == "validated"
     assert r["manifest"]["reconciliation"]["status"] == "validated"
 
 

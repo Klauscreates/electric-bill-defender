@@ -180,7 +180,8 @@ def test_outside_cycles_and_unversioned_dates(loaded, tariff):
     ({"demand_charge": True}, "Demand-charge"),
     ({"rate_schedule": "R-2"}, "demand charge"),
     ({"rate_schedule": "R-1"}, "non-time-of-use|fixed"),
-    ({"rate_schedule": "Something Else"}, "Only APS TOU-E"),
+    ({"rate_schedule": "Something Else"}, "Supported plans"),
+    ({"utility": "SRP"}, "does not match"),
 ])
 def test_unsupported_accounts_rejected(tmp_path, tariff, override, match):
     p = tmp_path / "h.yaml"

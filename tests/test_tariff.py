@@ -18,7 +18,7 @@ def period(tariff, when: str, season: str, version="TOU-E-rev3") -> str:
 def test_config_matches_official_tariff_rev3(tariff):
     v = tariff.get_version("TOU-E-rev3")
     assert v.effective_start == date(2024, 3, 8)
-    assert v.basic_service_charge_per_day == 0.458
+    assert v.fixed_charges == {"per_day": 0.458}
     assert v.energy_rates == {
         "summer": {"on_peak": 0.34396, "off_peak": 0.12345},
         "winter": {"on_peak": 0.32543, "off_peak": 0.12351, "super_off_peak": 0.03495},

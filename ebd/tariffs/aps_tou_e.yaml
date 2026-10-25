@@ -9,14 +9,25 @@
 
 utility: APS
 schedule: TOU-E
+notes:
+  - "The tariff does not say whether winter Super Off-Peak applies on weekday holidays; see holiday_super_off_peak."
 name: Residential Time-of-Use Service, Time-of-Use 4pm-7pm Weekdays
 # Names a household file may use for this schedule (case-insensitive).
 aliases: [TOU-E, R-TOU-E, RTOUE47, "Time-of-Use 4pm-7pm Weekdays", "Saver Choice"]
 
+# APS revisions take effect on a calendar date ("Effective: March 8, 2024").
+version_basis: service_date
+
+# Season is set by the BILLING CYCLE, not the calendar date of each interval.
 seasons:
-  # Season is set by the BILLING CYCLE, not the calendar date of each interval.
-  summer_billing_months: [5, 6, 7, 8, 9, 10]
-  winter_billing_months: [11, 12, 1, 2, 3, 4]
+  summer: [5, 6, 7, 8, 9, 10]
+  winter: [11, 12, 1, 2, 3, 4]
+
+# Shift scenarios move On-Peak kWh into this same-day window (after the 7 p.m. peak end).
+shift_destination: {start: "19:00", end: "23:00"}
+
+# APS bills are compared at full precision.
+bill_rounding: none
 
 # Charges on the bill that this tool does NOT model. Listed verbatim in every report.
 excluded_charges:
@@ -44,7 +55,7 @@ versions:
       url: "https://www.aps.com/-/media/APS/APSCOM-PDFs/Utility/Regulatory-and-Legal/Regulatory-Plan-Details-Tariffs/Residential/Service-Plans/Time-of-Use-4pm-7pmWeekdays_R-TOU-E.pdf"
       verified_on: 2026-10-24
       verified_how: "Downloaded from the APS tariff directory and transcribed from pages 1-2."
-    basic_service_charge_per_day: 0.458
+    fixed_charges: {per_day: 0.458}   # Basic Service Charge
     # Bundled energy charges, $/kWh.
     energy_rates:
       summer:
